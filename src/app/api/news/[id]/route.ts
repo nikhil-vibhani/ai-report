@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteNews, getNewsById, updateNewsContent } from "@/data/newsRepo";
-import { getGeminiModel } from "@/lib/ai";
+import { withKeyRotation } from "@/lib/ai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -34,17 +34,20 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
       const existing = await getNewsById(id);
       if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-      const model = getGeminiModel();
       const system = new SystemMessage(
         "You are a professional Gujarati broadcast news anchor and editor. Rewrite or edit the provided news article per the user's instructions strictly in Gujarati language, maintaining a neutral, formal anchor-style tone. Use markdown format, preserve key facts; if adding, mark as assumptions."
       );
       const user = new HumanMessage(
         `Current article (markdown):\n\n${existing.content}\n\nInstructions: ${instructions}\n\nReturn the full updated article in Gujarati only, markdown only.`
       );
-      const aiRes = await model.invoke([system, user]);
-      const normalizeContent = (ai: { content: unknown }): string =>
-        typeof ai.content === "string" ? ai.content : String(ai.content);
-      contentUpdate = normalizeContent(aiRes as { content: unknown });
+      
+      // Use withKeyRotation to handle API key rotation automatically
+      contentUpdate = await withKeyRotation(async (model) => {
+        const aiRes = await model.invoke([system, user]);
+        const normalizeContent = (ai: { content: unknown }): string =>
+          typeof ai.content === "string" ? ai.content : String(ai.content);
+        return normalizeContent(aiRes as { content: unknown });
+      });
     }
 
     // Prefer deriving Gujarati title from updated content when available

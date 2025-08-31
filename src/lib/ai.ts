@@ -17,9 +17,15 @@ const RATE_LIMIT_CODES = [
   'rate_limit_exceeded'
 ];
 
-function isRateLimitError(error: any): boolean {
-  const errorMessage = (error.message || '').toLowerCase();
-  const errorCode = error.code || '';
+interface ApiError extends Error {
+  code?: string | number;
+  message: string;
+}
+
+function isRateLimitError(error: unknown): boolean {
+  const err = error as ApiError;
+  const errorMessage = (err.message || '').toLowerCase();
+  const errorCode = (err.code || '').toString();
   
   return RATE_LIMIT_CODES.some(code => 
     errorMessage.includes(code.toLowerCase()) || 
@@ -66,8 +72,9 @@ export async function withKeyRotation<T>(
       const model = await getGeminiModel();
       const result = await fn(model);
       return result;
-    } catch (error: any) {
-      lastError = error;
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      lastError = err;
       
       if (isRateLimitError(error) && currentApiKey) {
         console.warn(`Rate limit hit for API key (${currentApiKey.substring(0, 10)}...), rotating to next key`);

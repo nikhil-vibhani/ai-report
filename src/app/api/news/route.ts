@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertNews, listNews } from "@/data/newsRepo";
-import { getGeminiModel } from "@/lib/ai";
+import { withKeyRotation } from "@/lib/ai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 export async function GET(req: NextRequest) {
@@ -25,7 +25,6 @@ export async function POST(req: NextRequest) {
 
     let content = (providedContent ?? "").trim();
     if (!content) {
-      const model = getGeminiModel();
       const system = new SystemMessage(
         "You are a professional Gujarati broadcast news anchor and editor. Write complete, factual news reports strictly in Gujarati language with a neutral, formal anchor-style tone. Use markdown with headings and short paragraphs. Avoid sensationalism. If facts are missing, clearly state assumptions."
       );
@@ -45,11 +44,13 @@ Requirements:
 - Output markdown only and Gujarati only.`
       );
 
-      const aiRes = await model.invoke([system, user]);
-      // aiRes can be a BaseMessage or string-like depending on model; normalize
-      const normalizeContent = (ai: { content: unknown }): string =>
-        typeof ai.content === "string" ? ai.content : String(ai.content);
-      content = normalizeContent(aiRes as { content: unknown });
+      // Use withKeyRotation to handle API key rotation automatically
+      content = await withKeyRotation(async (model) => {
+        const aiRes = await model.invoke([system, user]);
+        const normalizeContent = (ai: { content: unknown }): string =>
+          typeof ai.content === "string" ? ai.content : String(ai.content);
+        return normalizeContent(aiRes as { content: unknown });
+      });
     }
 
     // Derive title from first markdown heading if present to ensure Gujarati title is stored

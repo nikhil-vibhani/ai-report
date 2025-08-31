@@ -15,7 +15,6 @@ type KeyStatus = {
 };
 
 let keys: KeyStatus[] = [];
-let currentKeyIndex = 0;
 
 // Initialize keys array
 if (GEMINI_API_KEYS.length === 0) {
@@ -44,7 +43,6 @@ export function getNextKey(): string | null {
 
   // Update key status
   availableKey.lastUsed = now;
-  currentKeyIndex = keys.indexOf(availableKey);
   
   return availableKey.key;
 }

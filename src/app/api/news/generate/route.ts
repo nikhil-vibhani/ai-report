@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     // Fresh generation flow with format-specific prompts
     const system = new SystemMessage(
-      "You are a professional Gujarati broadcast news anchor and editor. Write output strictly in Gujarati with a neutral, formal anchor-style tone. Use markdown. Avoid sensationalism. If facts are missing, clearly state assumptions. CRITICAL: Obey the requested structure EXACTLY. For every section that specifies a count (e.g., Top Band, VO Script, Express lines, Rundown stories), output EXACTLY that many items—no more, no less. Do NOT add extra bullets, do NOT omit any. Do NOT leave any numbered item blank; each item must contain a complete, meaningful sentence in Gujarati. Do NOT reorder any pre-listed, numbered, or topic-tagged lines provided in the template."
+      "You are a professional Gujarati broadcast news anchor and editor. Write output strictly in Gujarati with a neutral, formal anchor-style tone. Use markdown. Avoid sensationalism. If facts are missing, clearly state assumptions. CRITICAL: Obey the requested structure EXACTLY. For every section that specifies a count (e.g., Top Band (5 words), VO Script, Express lines, Rundown stories), output EXACTLY that many items—no more, no less. For Top Bands, each must be exactly 5 words. Do NOT add extra bullets, do NOT omit any. Do NOT leave any numbered item blank; each item must contain a complete, meaningful sentence in Gujarati. Do NOT reorder any pre-listed, numbered, or topic-tagged lines provided in the template."
     );
 
     const fmt: NewsFormat | undefined = format as NewsFormat | undefined;
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     let voCount = Math.max(1, Math.min(12, options?.voCount ?? (fmt === "SPECIAL" ? 10 : 5)));
     const storyCount = Math.max(5, Math.min(40, options?.storyCount ?? 30));
 
-    // AV format has fixed counts: Anchor 7 lines + Top Band 5
+    // AV format has fixed counts: Anchor 7 lines + Top Band (5 words)
     if (fmt === "AV") {
       voCount = 7;
       topBandCount = 5;
@@ -62,7 +62,6 @@ export async function POST(req: NextRequest) {
         if (!orderedSet.includes(L)) orderedSet.push(L);
       };
       for (const s of candidates) {
-        const lc = s.toLowerCase();
         if (/(parliament|lok sabha|rajya sabha)/i.test(s)) pushUnique("Parliament");
         else if (/(prime minister|\bpm\b|narendra modi)/i.test(s)) pushUnique("PM");
         else if (/(opposition|walkout)/i.test(s)) pushUnique("Opposition");
@@ -92,13 +91,41 @@ export async function POST(req: NextRequest) {
       const header = `શીર્ષક: ${safeTitle}\nવિભાગ: ${category ?? "General"}\nસ્થળ: ${location ?? "N/A"}\nસંદર્ભ: ${brief ?? ""}`;
       switch (fmt) {
         case "AV": 
-          return `${header}\n\nઆઉટપુટ બંધારણ (Gujarati only, markdown only):\n# ${safeTitle}\n\n## Anchor Script\n(Write a single 300-word paragraph in Gujarati. Do NOT use any numbered format like 1), 2), 3). Write one continuous flowing paragraph with complete sentences and detailed content.)\n\n## Top Band (${topBandCount})\n${Array.from({ length: topBandCount }).map(() => "- ").join("\n")}`;
+          return `${header}
+
+આઉટપુટ બંધારણ (Gujarati only, markdown only):
+# ${safeTitle}
+
+## Anchor Script
+(Write a single 300-word paragraph in Gujarati. Do NOT use any numbered format like 1), 2), 3). Write one continuous flowing paragraph with complete sentences and detailed content.)
+
+## Top Band (5 words each)
+${Array.from({ length: 5 }).map(() => "- ").join("\n")}`;
         case "PKG": {
           const voSections = [];
           for (let i = 0; i < voCount; i++) {
             voSections.push(`## VO Script ${i + 1} (15-line paragraph)\n(Write a single 15-line paragraph in Gujarati)`);
           }
-          return `${header}\n\nઆઉટપુટ બંધારણ (Gujarati only, markdown only):\n# ${safeTitle}\n\n## Anchor Opening (2 lines)\n1)\n2)\n\n${voSections.join('\n\n')}\n\n## Anchor Closing Summary (5 lines)\n1)\n2)\n3)\n4)\n5)\n\n## Top Band (${topBandCount})\n${Array.from({ length: topBandCount }).map(() => "- ").join("\n")}`;
+          return `${header}
+
+આઉટપુટ બંધારણ (Gujarati only, markdown only):
+# ${safeTitle}
+
+## Anchor Opening (2 lines)
+1)
+2)
+
+${voSections.join('\n\n')}
+
+## Anchor Closing Summary (5 lines)
+1)
+2)
+3)
+4)
+5)
+
+## Top Band (5 words each)
+${Array.from({ length: 5 }).map(() => "- ").join("\n")}`;
         }
         case "AV_GFX":
           return `${header}\n\nઆઉટપુટ બંધારણ (Gujarati only, markdown only):\n# ${safeTitle}\n\n## Story\n(Write a 150-word story in Gujarati. Keep it concise and focused on the key points.)\n\n## Top Bands (${topBandCount})\n${Array.from({ length: topBandCount }).map(() => "- ").join("\n")}`;
@@ -128,20 +155,59 @@ export async function POST(req: NextRequest) {
           for (let i = 0; i < voCount; i++) {
             voSections.push(`## VO Script ${i + 1} (30-line paragraph)\n(Write a single 30-line paragraph in Gujarati)`);
           }
-          return `${header}\n\n# ${safeTitle}\n\n## Anchor Opening (8 lines)\n1)\n2)\n3)\n4)\n5)\n6)\n7)\n8)\n\n${voSections.join('\n\n')}\n\n## Anchor Closing Summary (5 lines)\n1)\n2)\n3)\n4)\n5)\n\n## Top Band (${topBandCount})\n${Array.from({ length: topBandCount }).map(() => "- ").join("\n")}\n\n## Top Band GFX (${topBandCount} × 3 variants)\n${Array.from({ length: topBandCount }).map((_, i) => `${i + 1}) A)  B)  C)`).join("\n")}`;
+          return `${header}
+
+# ${safeTitle}
+
+## Anchor Opening (8 lines)
+1)
+2)
+3)
+4)
+5)
+6)
+7)
+8)
+
+${voSections.join('\n\n')}
+
+## Anchor Closing Summary (5 lines)
+1)
+2)
+3)
+4)
+5)
+
+## Top Band (5 words each)
+${Array.from({ length: 5 }).map(() => "- સમાચાર રિપોર્ટ ટાઇટલ").join("\n")}
+
+## Top Band GFX (5 words each × 3 variants)
+${Array.from({ length: 5 }).map((_, i) => `${i + 1}) A) સમાચાર રિપોર્ટ ટાઇટલ  B) સમાચાર રિપોર્ટ ટાઇટલ  C) સમાચાર રિપોર્ટ ટાઇટલ`).join("\n")}`;
         }
-        // case "SPECIAL":
-        //   return `${header}\n\n# ${safeTitle}\n\n## Anchor Opening (8 lines)\n1)\n2)\n3)\n4)\n5)\n6)\n7)\n8)\n\n## VO Script (${voCount} lines)\n${Array.from({ length: voCount }).map((_, i) => `VO-${i + 1})`).join("\n")}\n\n## Anchor Closing Summary (5 lines)\n1)\n2)\n3)\n4)\n5)\n\n## Top Band (${topBandCount})\n${Array.from({ length: topBandCount }).map(() => "- ").join("\n")}\n\n## Top Band GFX (${topBandCount} × 3 variants)\n${Array.from({ length: topBandCount }).map((_, i) => `${i + 1}) A)  B)  C)`).join("\n")}`;
         default:
           // Backward-compatible generic article with summary
-          return `Write a complete news report. Output must be in Gujarati only.\nTitle: ${safeTitle}\nCategory: ${category ?? "General"}\nLocation: ${location ?? "N/A"}\nBrief/context: ${brief ?? ""}\n\nRequirements:\n- Use a professional Gujarati news anchor tone: precise, neutral, formal, clear.\n- 6-10 short paragraphs with clear sections and a concise intro.\n- Include key facts, quotes (if not provided, mark as attributed or hypothetical), dates, numbers when relevant.\n- Include a short summary at the end under 'સારાંશ'.\n- Output markdown only and Gujarati only.`;
+          const defaultPrompt = [
+            'Write a complete news report. Output must be in Gujarati only.',
+            `Title: ${safeTitle}`,
+            `Category: ${category ?? "General"}`,
+            `Location: ${location ?? "N/A"}`,
+            `Brief/context: ${brief ?? ""}
+            
+Requirements:
+- Use a professional Gujarati news anchor tone: precise, neutral, formal, clear.
+- 6-10 short paragraphs with clear sections and a concise intro.
+- Include key facts, quotes (if not provided, mark as attributed or hypothetical), dates, numbers when relevant.
+- Include a short summary at the end under \'સારાંશ\'.
+- Output markdown only and Gujarati only.`
+          ].join('\n');
+          return defaultPrompt;
       }
     }
 
     const user = new HumanMessage(userPrompt());
     
     // Use withKeyRotation to handle API key rotation automatically
-    let content = await withKeyRotation(async (model) => {
+    const content = await withKeyRotation(async (model) => {
       const aiRes = await model.invoke([system, user]);
       let result = normalizeContent(aiRes as { content: unknown });
       
