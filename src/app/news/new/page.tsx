@@ -359,7 +359,8 @@ export default function NewNewsPage() {
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={loading || !content.trim()}
+                disabled={true}
+                // disabled={loading || !content.trim()}
                 className="px-4 py-2 rounded bg-foreground text-background disabled:opacity-60"
               >
                 {loading ? "Saving..." : "Save"}

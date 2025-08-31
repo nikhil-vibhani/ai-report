@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGeminiModel } from "@/lib/ai";
+import { withKeyRotation } from "@/lib/ai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { GenerateRequestBody, NewsFormat } from "@/types/news";
 
@@ -10,8 +10,6 @@ export async function POST(req: NextRequest) {
       body as GenerateRequestBody;
 
     const safeTitle = (title && title.trim()) || "સમાચાર રિપોર્ટ";
-
-    const model = getGeminiModel();
 
     // Helper to normalize content from AI message objects
     const normalizeContent = (ai: { content: unknown }): string =>
@@ -25,8 +23,13 @@ export async function POST(req: NextRequest) {
       const user = new HumanMessage(
         `Title: ${safeTitle}\nCategory: ${category ?? "General"}\nLocation: ${location ?? "N/A"}\nBrief/context: ${brief ?? ""}\n\nCurrent article (markdown):\n\n${baseContent ?? ""}\n\nInstructions: ${instructions ?? "Revise and improve clarity keeping the same facts."}\n\nReturn the full updated article in Gujarati only, markdown only. Include a 'સારાંશ' section at the end.`
       );
-      const aiRes = await model.invoke([system, user]);
-      const content = normalizeContent(aiRes as { content: unknown });
+      
+      // Use withKeyRotation to handle API key rotation automatically
+      const content = await withKeyRotation(async (model) => {
+        const aiRes = await model.invoke([system, user]);
+        return normalizeContent(aiRes as { content: unknown });
+      });
+      
       return NextResponse.json({ content });
     }
 
@@ -136,14 +139,20 @@ export async function POST(req: NextRequest) {
     }
 
     const user = new HumanMessage(userPrompt());
-    const aiRes = await model.invoke([system, user]);
-    let content = normalizeContent(aiRes as { content: unknown });
-
-    // Safety: ensure no blank numbered items for AV anchor lines
-    if (fmt === "AV") {
-      const filler = "આજના મુખ્ય મુદ્દા પર એક સંક્ષિપ્ત, સ્પષ્ટ વાક્ય.";
-      content = content.replace(/^(\s*\d+\)\s*)$/gm, (_, p1: string) => `${p1}${filler}`);
-    }
+    
+    // Use withKeyRotation to handle API key rotation automatically
+    let content = await withKeyRotation(async (model) => {
+      const aiRes = await model.invoke([system, user]);
+      let result = normalizeContent(aiRes as { content: unknown });
+      
+      // Safety: ensure no blank numbered items for AV anchor lines
+      if (fmt === "AV") {
+        const filler = "આજના મુખ્ય મુદ્દા પર એક સંક્ષિપ્ત, સ્પષ્ટ વાક્ય.";
+        result = result.replace(/^(\s*\d+\)\s*)$/gm, (_, p1: string) => `${p1}${filler}`);
+      }
+      
+      return result;
+    });
 
     return NextResponse.json({ content });
   } catch (err: unknown) {
